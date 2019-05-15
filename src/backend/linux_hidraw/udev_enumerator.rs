@@ -112,6 +112,7 @@ mod test {
     use super::Enumerator;
     use libudev::Context;
     use crate::backend::ApiDeviceInfo;
+    use std::string::ToString;
 
     #[test]
     fn test_enumeration() {

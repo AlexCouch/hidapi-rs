@@ -3,21 +3,30 @@
 //
 // This file is part of hidapi-rs, based on hidapi-rs by Osspial
 // **************************************************************************
+//
+// This file should be considered as part of a common module where the different backends implement the common module.
+// This error module provides a common interface for setting and getting errors. However, setting errors should be called externally (via hidapi-rs child modules (aka children))
+// and getting an error should be called internally. This abstract module should only provide an interface for children to easily
+// invoke a panic with the error type and error message without having to define their own error messages and formatting. This error module should format
+// all the error messages for the children in a way that provides all the necessary information needed to debug the use of hidapi-rs.
+// This is why the error module should be abstracted for specific backends to implement their own error handling since different backends rely on different
+// HID api's (mac -> IOHidManager; Windows -> setupapi -> linux -> hidraw) which provide different types and handle devices differently.
+// - Alex Couch, 2019, May 14
 
 use cfg_if::cfg_if;
 use failure::{Compat, Error};
-#[cfg(any(
-    feature = "linux-static-hidraw",
-    feature = "linux-static-libusb",
-    feature = "linux-shared-hidraw",
-    feature = "linux-shared-libusb"
-))]
-use libc::wchar_t;
 
-pub type HidResult<T> = Result<T, HidError>;
+/// TODO: Abstract the ApiResult so that backends can have their own dedicated result type.
+pub type ApiResult<T> = Result<T, ErrorEnum>;
 
+/// TODO: Work on a better error handling system. Get rid of enum maybe?<br>
+/// TODO: Abstract the error handling system into a subapi.<br>
+/// TODO: Work on create a common module that different platforms can inplement for different backends. Including the error system.<br>
+///     Panics should be internally called when someone calls ApiError::set_error.<br>
+///     If someone calls set_error, the unwrapping should be handled internally so that the caller just needs to call a single function.<br>
+/// -Alex, 2019, May 14
 #[derive(Debug, Fail)]
-pub enum HidError {
+pub enum ErrorEnum {
     #[fail(display = "hidapi error: {}", message)]
     HidApiError { message: String },
 
@@ -59,32 +68,16 @@ pub enum HidError {
 
     #[fail(display = "Can not set blocking mode to '{}'", mode)]
     SetBlockingModeError { mode: &'static str },
-
-    #[cfg(feature = "linux-rust-hidraw")]
-    #[fail(display = "Udev error: {}", udev_e)]
-    UdevError { udev_e: libudev::Error },
-
-    #[cfg(feature = "linux-rust-hidraw")]
-    #[fail(display = "Nix error: {}", nix_e)]
-    NixError { nix_e: nix::Error },
 }
 
-pub trait ResultExt<T> {
-    /// Convert any Result<T, E> into Result<T, HidError {E}>
-    fn convert(self) -> Result<T, HidError>;
-}
+pub trait ApiError{
+    /// Set an error to be unwrapped in an internal panic!.
+    /// 
+    /// @param error The error type to throw
+    fn set_error(error: ErrorEnum);
 
-cfg_if! {
-    if #[cfg(feature = "linux-rust-hidraw")] {
-        impl<T> ResultExt<T> for Result<T, libudev::Error> {
-            fn convert(self) -> Result<T, HidError> {
-                self.map_err(|udev_e| HidError::UdevError { udev_e })
-            }
-        }
-        impl<T> ResultExt<T> for Result<T, nix::Error> {
-            fn convert(self) -> Result<T, HidError> {
-                self.map_err(|nix_e| HidError::NixError { nix_e })
-            }
-        }
-    }
+    /// Get the error that was set by something and then unwrap in an internal panic!.
+    /// 
+    /// @return An option of whether an error was set or not. Some(error) or None.
+    fn get_error() -> Option<ErrorEnum>;
 }

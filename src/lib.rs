@@ -19,9 +19,6 @@
 #[macro_use]
 extern crate failure_derive;
 extern crate failure;
-#[cfg(feature = "linux-rust-hidraw")]
-#[macro_use]
-pub extern crate nix;
 
 mod backend;
 mod error;
