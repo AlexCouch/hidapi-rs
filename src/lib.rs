@@ -15,8 +15,10 @@
 //! # Example
 //!
 //! **TODO: Write new example**
+#[feature(str_as_mut_ptr)]
 
 #[macro_use]
+
 extern crate failure_derive;
 extern crate failure;
 

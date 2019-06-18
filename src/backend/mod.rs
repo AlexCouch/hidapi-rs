@@ -6,6 +6,9 @@
 
 use cfg_if::cfg_if;
 
+mod ffi;
+use ffi::{ApiDevice, ApiEnumerator};
+
 cfg_if! {
     if #[cfg(unix)]{
         cfg_if!{
@@ -47,7 +50,7 @@ where
     Self: Sized,
     Self::Device: ApiDevice + Read + Write,
     Self::DeviceInfo: ApiDeviceInfo,
-    Self::DeviceInfoIter: Iterator<Item = Self::DeviceInfo>,
+    Self::DeviceInfoIter: ApiEnumerator<Self::DeviceInfo>,
 {
     type Device;
     type DeviceInfo;
@@ -59,16 +62,11 @@ where
     fn enumerate(&mut self) -> ApiResult<Self::DeviceInfoIter>;
 }
 
-pub trait ApiDevice: Write + Read {
-    fn write_report_id(&mut self, report_id: u8, data: &[u8]) -> std::io::Result<usize> {
-        let mut buf = Vec::with_capacity(data.len() + 1);
-        buf.push(report_id);
-        buf.extend_from_slice(data);
-
-        self.write(buf.as_slice())
-    }
-}
-
+/// A common trait to be shared between the user layer and the ffi layer.
+/// ffi layer will construct a new ApiDeviceInfo and pass it to the mid layer
+/// to be shared between the two. Reason being that if something changes with
+/// the device, the ffi layer will have direct access to it, and will notify the
+/// user layer of any changes such as a disconnected/unpaired event.
 pub trait ApiDeviceInfo {
     fn path(&self) -> Option<String>;
     fn vendor_id(&self) -> u16;
@@ -102,6 +100,6 @@ pub trait ApiDeviceInfo {
 ///     }
 /// }
 /// ```
-fn create_backend<T>() -> HidResult<T> where T: ApiBackend {
+fn create_backend<T>() -> ApiResult<T> where T: ApiBackend {
     return T::create();
 }
